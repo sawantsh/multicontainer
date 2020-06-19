@@ -1,0 +1,64 @@
+version: '3'
+services:
+    postgres:
+        #try to create postgres service using 10-alpine vesrion of postgres
+        image: 'postgres:latest'
+        environment:
+            - POSTGRES_PASSWORD=postgres_password
+    redis:
+        #try to create redis service using latest vesrion of redis
+        image: 'redis:latest'
+    nginx:
+        #make sure nginx always up
+        restart: always
+        build:
+            dockerfile: Dockerfile.dev
+            context: ./nginx
+        ports:
+            #map 3050 local machine port with 80 port access 3050 port to access from local machine
+            - '3050:80'
+    api:
+        depends_on:
+            - postgres
+        build:
+            dockerfile: Dockerfile.dev
+            #where to find the Dockerfile.dev
+            context: ./server
+        volumes:
+            #inside the container don't try to override the folder, leave it untouched
+            - /app/node_modules
+            #anything except node_modules, redirect to server directory inside project folder
+            #any change inside serve folder will auto reflect in app folder inside container
+            - ./server:/app
+
+            # 1st way to define environment variable -> variableName=value -> sets a variable in the container at run time
+            # 2nd way to define environment variable -> variableName -> sets a variable in the container at run time -> value is taken from your computer
+        environment:
+            # host is the redis service
+            - REDIS_HOST=redis
+            - REDIS_PORT=6379
+            # default user is postgres
+            - PGUSER=postgres
+            # host is postgres service defined above
+            - PGHOST=postgres
+            - PGDATABASE=postgres
+            # default password is postgres_password
+            - PASSWORD=postgres_password
+            - PGPORT=5432
+    client:
+        stdin_open: true
+        build:
+            dockerfile: Dockerfile.dev
+            context: ./client
+        volumes:
+            - /app/node_modules
+            #sets up relationship between the source inside the client directory and the app folder inside the container
+            - ./client:/app
+    worker:
+        build: 
+            dockerfile: Dockerfile.dev
+            context: ./worker
+        volumes:
+            - /app/node_modules
+            #sets up relationship between the source inside the worker directory and the app folder inside the container
+            - ./worker:/app
